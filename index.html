@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>佳里奇美醫院｜評審評分系統</title>
+<style>
+  :root {
+    --bg: #F6F4EF;
+    --card: #FFFFFF;
+    --ink: #2C3A36;
+    --ink-soft: #6B7772;
+    --line: #E2DED3;
+    --sage: #5F7D72;
+    --sage-dark: #47615A;
+    --sage-tint: #EAF0EC;
+    --warn: #B4694B;
+    --warn-tint: #F6E9E3;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  header {
+    padding: 28px 20px 18px;
+    text-align: center;
+    border-bottom: 1px solid var(--line);
+    background: var(--card);
+  }
+  header h1 {
+    margin: 0 0 4px;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  header p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  main {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 24px 18px 60px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+  }
+  .card + .card { margin-top: 16px; }
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 14px 0 6px;
+  }
+  label:first-of-type { margin-top: 0; }
+  input[type="text"],
+  input[type="password"],
+  input[type="number"],
+  textarea {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    background: #FDFCFA;
+    color: var(--ink);
+  }
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--sage);
+    box-shadow: 0 0 0 3px var(--sage-tint);
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  button {
+    width: 100%;
+    padding: 13px;
+    margin-top: 20px;
+    border: none;
+    border-radius: 8px;
+    background: var(--sage);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  button:hover { background: var(--sage-dark); }
+  button:disabled { background: #B9C4BF; cursor: default; }
+  button.ghost {
+    background: transparent;
+    color: var(--sage-dark);
+    border: 1px solid var(--sage);
+  }
+  button.ghost:hover { background: var(--sage-tint); }
+  .error {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: var(--warn-tint);
+    color: var(--warn);
+    border-radius: 8px;
+    font-size: 13px;
+    display: none;
+  }
+  .error.show { display: block; }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .topbar .who {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .topbar .who b { color: var(--ink); }
+  .logout {
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: none;
+    border: none;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--sage-dark);
+    letter-spacing: 0.04em;
+    margin: 22px 0 10px;
+  }
+  .section-title:first-child { margin-top: 0; }
+  .team-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    background: #FDFCFA;
+  }
+  .team-item:hover { border-color: var(--sage); }
+  .team-item .code { font-size: 15px; font-weight: 600; }
+  .team-item .status {
+    font-size: 12px;
+    padding: 3px 9px;
+    border-radius: 20px;
+  }
+  .status.pending { background: #EFEAE0; color: var(--ink-soft); }
+  .status.pass { background: var(--sage-tint); color: var(--sage-dark); }
+  .status.fail { background: var(--warn-tint); color: var(--warn); }
+  .crit-block {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .crit-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .crit-head .name { font-size: 15px; font-weight: 700; }
+  .crit-head .max { font-size: 12px; color: var(--ink-soft); }
+  .crit-desc {
+    font-size: 13px;
+    color: var(--ink-soft);
+    white-space: pre-line;
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+  .score-row { display: flex; gap: 10px; align-items: center; }
+  .score-row input[type="number"] { max-width: 90px; }
+  .back-link {
+    display: inline-block;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--sage-dark);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .total-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--sage-tint);
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+  .total-bar b { font-size: 18px; color: var(--sage-dark); }
+  .hidden { display: none !important; }
+  .loading { text-align: center; color: var(--ink-soft); font-size: 13px; padding: 20px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>全院數據平台期末成果競賽</h1>
+  <p>評審登入評分系統</p>
+</header>
+
+<main>
+
+  <!-- 登入畫面 -->
+  <section id="view-login" class="card">
+    <label for="account">帳號</label>
+    <input type="text" id="account" autocomplete="username">
+    <label for="password">密碼</label>
+    <input type="password" id="password" autocomplete="current-password">
+    <div class="error" id="login-error"></div>
+    <button id="btn-login">登入</button>
+  </section>
+
+  <!-- 受評清單 -->
+  <section id="view-list" class="hidden">
+    <div class="topbar">
+      <span class="who">評審：<b id="who-name"></b></span>
+      <button class="logout" id="btn-logout">登出</button>
+    </div>
+    <div id="list-content"><div class="loading">載入中…</div></div>
+  </section>
+
+  <!-- 評分表單 -->
+  <section id="view-score" class="hidden">
+    <span class="back-link" id="btn-back">← 返回清單</span>
+    <div class="card">
+      <div class="topbar" style="margin-bottom:0;">
+        <span class="who">受評編號：<b id="score-code"></b></span>
+      </div>
+      <div id="crit-list" style="margin-top:16px;"></div>
+      <div class="total-bar">
+        <span>目前總分</span>
+        <b id="live-total">0</b>
+      </div>
+      <label for="overall-comment">整體總評</label>
+      <textarea id="overall-comment" placeholder="針對整份報告的總結評語"></textarea>
+      <div class="error" id="score-error"></div>
+      <button id="btn-submit">送出評分</button>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// ⚠️ 部署 GAS 網頁應用程式後，把網址貼在這裡
+const GAS_URL = 'https://script.google.com/macros/s/替換成你的部署ID/exec';
+
+let state = {
+  token: localStorage.getItem('rs_token') || null,
+  judgeName: localStorage.getItem('rs_name') || '',
+  teams: [],
+  currentTeam: null,
+  criteria: [],
+};
+
+const $ = (id) => document.getElementById(id);
+
+function showView(name) {
+  ['login', 'list', 'score'].forEach(v => {
+    $('view-' + v).classList.toggle('hidden', v !== name);
+  });
+}
+
+function showError(elId, msg) {
+  const el = $(elId);
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function clearError(elId) {
+  $(elId).classList.remove('show');
+  $(elId).textContent = '';
+}
+
+async function apiGet(params) {
+  const url = GAS_URL + '?' + new URLSearchParams(params).toString();
+  const res = await fetch(url);
+  return res.json();
+}
+async function apiPost(payload) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免 CORS 預檢
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
+// ---------------- 登入 ----------------
+
+$('btn-login').addEventListener('click', async () => {
+  clearError('login-error');
+  const account = $('account').value.trim();
+  const password = $('password').value;
+  if (!account || !password) {
+    showError('login-error', '請輸入帳號與密碼');
+    return;
+  }
+  $('btn-login').disabled = true;
+  const resp = await apiPost({ action: 'login', account, password });
+  $('btn-login').disabled = false;
+
+  if (!resp.success) {
+    showError('login-error', resp.message || '登入失敗');
+    return;
+  }
+  state.token = resp.token;
+  state.judgeName = resp.judgeName;
+  localStorage.setItem('rs_token', resp.token);
+  localStorage.setItem('rs_name', resp.judgeName);
+  enterList();
+});
+
+$('btn-logout').addEventListener('click', () => {
+  state.token = null;
+  localStorage.removeItem('rs_token');
+  localStorage.removeItem('rs_name');
+  showView('login');
+});
+
+// ---------------- 受評清單 ----------------
+
+async function enterList() {
+  $('who-name').textContent = state.judgeName;
+  showView('list');
+  $('list-content').innerHTML = '<div class="loading">載入中…</div>';
+
+  const resp = await apiGet({ action: 'getTeams', token: state.token });
+  if (!resp.success) {
+    showView('login');
+    showError('login-error', resp.message || '登入已過期，請重新登入');
+    return;
+  }
+  state.teams = resp.teams;
+  renderList();
+}
+
+function renderList() {
+  const groups = {};
+  state.teams.forEach(t => {
+    if (!groups[t.category]) groups[t.category] = [];
+    groups[t.category].push(t);
+  });
+
+  let html = '';
+  Object.keys(groups).forEach(cat => {
+    html += `<div class="section-title">${cat}</div>`;
+    groups[cat].forEach(t => {
+      let statusClass = 'pending', statusText = '尚未評分';
+      if (t.completed) {
+        statusClass = t.decision === '通過' ? 'pass' : 'fail';
+        statusText = `${t.decision}（${t.totalScore}分）`;
+      }
+      html += `
+        <div class="team-item" data-team-id="${t.teamId}">
+          <span class="code">${t.anonCode}</span>
+          <span class="status ${statusClass}">${statusText}</span>
+        </div>`;
+    });
+  });
+  $('list-content').innerHTML = html || '<div class="loading">目前沒有受評項目</div>';
+
+  document.querySelectorAll('.team-item').forEach(el => {
+    el.addEventListener('click', () => openScoreForm(el.dataset.teamId));
+  });
+}
+
+// ---------------- 評分表單 ----------------
+
+$('btn-back').addEventListener('click', () => showView('list'));
+
+async function openScoreForm(teamId) {
+  const team = state.teams.find(t => t.teamId === teamId);
+  state.currentTeam = team;
+  showView('score');
+  $('score-code').textContent = team.anonCode;
+  $('crit-list').innerHTML = '<div class="loading">載入評分項目…</div>';
+  clearError('score-error');
+
+  const [critResp, myResp] = await Promise.all([
+    apiGet({ action: 'getCriteria', category: team.category }),
+    apiGet({ action: 'getMyReview', token: state.token, teamId }),
+  ]);
+
+  if (!critResp.success) {
+    showError('score-error', critResp.message || '讀取評分項目失敗');
+    return;
+  }
+  state.criteria = critResp.criteria;
+
+  const prevScores = {};
+  if (myResp.success) {
+    (myResp.scores || []).forEach(s => { prevScores[s.criteriaId] = s; });
+  }
+
+  $('crit-list').innerHTML = state.criteria.map(c => {
+    const prev = prevScores[c.criteriaId];
+    return `
+      <div class="crit-block" data-criteria-id="${c.criteriaId}" data-max="${c.maxPoints}">
+        <div class="crit-head">
+          <span class="name">${c.name}</span>
+          <span class="max">滿分 ${c.maxPoints}</span>
+        </div>
+        <div class="crit-desc">${c.description}</div>
+        <div class="score-row">
+          <input type="number" class="crit-score" min="0" max="${c.maxPoints}"
+                 value="${prev ? prev.score : ''}" placeholder="0-${c.maxPoints}">
+          <input type="text" class="crit-comment" placeholder="評語（可選填）"
+                 value="${prev ? (prev.comment || '') : ''}" style="flex:1;">
+        </div>
+      </div>`;
+  }).join('');
+
+  $('overall-comment').value = (myResp.success && myResp.overallComment) || '';
+
+  document.querySelectorAll('.crit-score').forEach(inp => {
+    inp.addEventListener('input', updateLiveTotal);
+  });
+  updateLiveTotal();
+}
+
+function updateLiveTotal() {
+  let total = 0;
+  document.querySelectorAll('.crit-block').forEach(block => {
+    const v = Number(block.querySelector('.crit-score').value);
+    if (!isNaN(v)) total += v;
+  });
+  $('live-total').textContent = total;
+}
+
+$('btn-submit').addEventListener('click', async () => {
+  clearError('score-error');
+  const blocks = document.querySelectorAll('.crit-block');
+  const scores = [];
+  for (const block of blocks) {
+    const criteriaId = block.dataset.criteriaId;
+    const max = Number(block.dataset.max);
+    const scoreInput = block.querySelector('.crit-score');
+    const commentInput = block.querySelector('.crit-comment');
+    const score = Number(scoreInput.value);
+    if (scoreInput.value === '' || isNaN(score) || score < 0 || score > max) {
+      showError('score-error', `「${block.querySelector('.name').textContent}」請填 0～${max} 分`);
+      return;
+    }
+    scores.push({ criteriaId, score, comment: commentInput.value.trim() });
+  }
+
+  $('btn-submit').disabled = true;
+  const resp = await apiPost({
+    action: 'submitScore',
+    token: state.token,
+    teamId: state.currentTeam.teamId,
+    scores,
+    overallComment: $('overall-comment').value.trim(),
+  });
+  $('btn-submit').disabled = false;
+
+  if (!resp.success) {
+    showError('score-error', resp.message || '送出失敗，請再試一次');
+    return;
+  }
+  await enterList(); // 回清單並刷新狀態
+});
+
+// ---------------- 初始化 ----------------
+
+if (state.token) {
+  enterList();
+} else {
+  showView('login');
+}
+</script>
+
+</body>
+</html>
