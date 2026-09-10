@@ -403,20 +403,20 @@ async function apiGet(params) {
   try {
     const url = GAS_URL + '?' + new URLSearchParams(params).toString();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), 40000);
     const res = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
     return await res.json();
   } catch (err) {
     console.error('apiGet 失敗：', err);
-    const msg = err.name === 'AbortError' ? '連線逾時（20秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
+    const msg = err.name === 'AbortError' ? '連線逾時（40秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
     return { success: false, message: msg };
   }
 }
 async function apiPost(payload) {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), 40000);
     const res = await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免 CORS 預檢
@@ -427,7 +427,7 @@ async function apiPost(payload) {
     return await res.json();
   } catch (err) {
     console.error('apiPost 失敗：', err);
-    const msg = err.name === 'AbortError' ? '連線逾時（20秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
+    const msg = err.name === 'AbortError' ? '連線逾時（40秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
     return { success: false, message: msg };
   }
 }
@@ -468,8 +468,10 @@ $('btn-login').addEventListener('click', async () => {
     return;
   }
   $('btn-login').disabled = true;
+  $('btn-login').textContent = '登入中…';
   const resp = await apiPost({ action: 'login', account, password });
   $('btn-login').disabled = false;
+  $('btn-login').textContent = '登入';
 
   if (!resp.success) {
     showError('login-error', resp.message || '登入失敗');
