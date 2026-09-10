@@ -192,6 +192,14 @@
   }
   button:hover { background: var(--sage-dark); }
   button:disabled { background: #B9C4BF; cursor: default; }
+  .btn-row { display: flex; gap: 10px; }
+  .btn-row button { flex: 1; }
+  button.ghost {
+    background: transparent;
+    color: var(--sage-dark);
+    border: 1px solid var(--sage);
+  }
+  button.ghost:hover { background: var(--sage-tint); }
   .error {
     margin-top: 12px;
     padding: 10px 12px;
@@ -244,6 +252,7 @@
   .team-item .code { font-size: 15px; font-weight: 600; }
   .team-item .status { font-size: 12px; padding: 3px 9px; border-radius: 20px; }
   .status.pending { background: #EFEAE0; color: var(--ink-soft); }
+  .status.draft { background: #F6E9CF; color: #8A6D2F; }
   .status.pass { background: var(--sage-tint); color: var(--sage-dark); }
   .status.fail { background: var(--warn-tint); color: var(--warn); }
   .crit-block {
@@ -347,6 +356,15 @@
     <div id="list-content"><div class="loading">載入中…</div></div>
   </section>
 
+  <!-- 管理員總覽 -->
+  <section id="view-admin" class="hidden">
+    <div class="topbar">
+      <span class="who">管理員：<b id="admin-who-name"></b></span>
+      <button class="logout" id="btn-admin-logout">登出</button>
+    </div>
+    <div id="admin-content"><div class="loading">載入中…</div></div>
+  </section>
+
   <!-- 評分表單 -->
   <section id="view-score" class="hidden">
     <span class="back-link" id="btn-back">← 返回清單</span>
@@ -362,7 +380,11 @@
       <label for="overall-comment">整體總評</label>
       <textarea id="overall-comment" placeholder="針對整份報告的總結評語"></textarea>
       <div class="error" id="score-error"></div>
-      <button id="btn-submit">送出評分</button>
+      <div class="error" id="score-saved" style="background:var(--sage-tint);color:var(--sage-dark);"></div>
+      <div class="btn-row">
+        <button id="btn-draft" class="ghost">暫存</button>
+        <button id="btn-submit">送出評分</button>
+      </div>
     </div>
   </section>
 
@@ -375,13 +397,14 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbxqG4skK10OKFXLp5Mvg47J
 let state = {
   token: localStorage.getItem('rs_token') || null,
   judgeName: localStorage.getItem('rs_name') || '',
+  role: localStorage.getItem('rs_role') || '',
   teams: [],
   currentTeam: null,
   criteria: [],
 };
 
 const $ = (id) => document.getElementById(id);
-const VIEWS = ['home', 'login', 'list', 'score'];
+const VIEWS = ['home', 'login', 'list', 'score', 'admin'];
 
 function showView(name) {
   VIEWS.forEach(v => {
@@ -403,20 +426,20 @@ async function apiGet(params) {
   try {
     const url = GAS_URL + '?' + new URLSearchParams(params).toString();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 40000);
+    const timeout = setTimeout(() => controller.abort(), 60000);
     const res = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
     return await res.json();
   } catch (err) {
     console.error('apiGet 失敗：', err);
-    const msg = err.name === 'AbortError' ? '連線逾時（40秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
+    const msg = err.name === 'AbortError' ? '連線逾時（60秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
     return { success: false, message: msg };
   }
 }
 async function apiPost(payload) {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 40000);
+    const timeout = setTimeout(() => controller.abort(), 60000);
     const res = await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免 CORS 預檢
@@ -427,7 +450,7 @@ async function apiPost(payload) {
     return await res.json();
   } catch (err) {
     console.error('apiPost 失敗：', err);
-    const msg = err.name === 'AbortError' ? '連線逾時（40秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
+    const msg = err.name === 'AbortError' ? '連線逾時（60秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
     return { success: false, message: msg };
   }
 }
@@ -479,15 +502,31 @@ $('btn-login').addEventListener('click', async () => {
   }
   state.token = resp.token;
   state.judgeName = resp.judgeName;
+  state.role = resp.role;
   localStorage.setItem('rs_token', resp.token);
   localStorage.setItem('rs_name', resp.judgeName);
-  enterList();
+  localStorage.setItem('rs_role', resp.role);
+  if (resp.role === '管理員') {
+    enterAdmin();
+  } else {
+    enterList();
+  }
+});
+
+$('btn-admin-logout').addEventListener('click', () => {
+  state.token = null;
+  localStorage.removeItem('rs_token');
+  localStorage.removeItem('rs_name');
+  localStorage.removeItem('rs_role');
+  showView('home');
+  loadHomeProgress();
 });
 
 $('btn-logout').addEventListener('click', () => {
   state.token = null;
   localStorage.removeItem('rs_token');
   localStorage.removeItem('rs_name');
+  localStorage.removeItem('rs_role');
   showView('home');
   loadHomeProgress();
 });
@@ -521,7 +560,10 @@ function renderList() {
     html += `<div class="section-title">${cat}</div>`;
     groups[cat].forEach(t => {
       let statusClass = 'pending', statusText = '尚未評分';
-      if (t.completed) {
+      if (t.status === 'draft') {
+        statusClass = 'draft';
+        statusText = '已暫存';
+      } else if (t.status === 'done') {
         statusClass = t.decision === '通過' ? 'pass' : 'fail';
         statusText = `${t.decision}（${t.totalScore}分）`;
       }
@@ -550,6 +592,7 @@ async function openScoreForm(teamId) {
   $('score-code').textContent = team.anonCode;
   $('crit-list').innerHTML = '<div class="loading">載入評分項目…</div>';
   clearError('score-error');
+  $('score-saved').classList.remove('show');
 
   let critResp, myResp;
   try {
@@ -618,6 +661,7 @@ function updateLiveTotal() {
 
 $('btn-submit').addEventListener('click', async () => {
   clearError('score-error');
+  $('score-saved').classList.remove('show');
   const blocks = document.querySelectorAll('.crit-block');
   const scores = [];
   for (const block of blocks) {
@@ -650,9 +694,124 @@ $('btn-submit').addEventListener('click', async () => {
   await enterList(); // 回清單並刷新狀態
 });
 
+$('btn-draft').addEventListener('click', async () => {
+  clearError('score-error');
+  $('score-saved').classList.remove('show');
+  const blocks = document.querySelectorAll('.crit-block');
+  const scores = [];
+  for (const block of blocks) {
+    const criteriaId = block.dataset.criteriaId;
+    const max = Number(block.dataset.max);
+    const scoreInput = block.querySelector('.crit-score');
+    const commentInput = block.querySelector('.crit-comment');
+    if (scoreInput.value === '') continue; // 暫存允許留空，跳過未填的項目
+
+    const score = Number(scoreInput.value);
+    if (isNaN(score) || score < 0 || score > max) {
+      showError('score-error', `「${block.querySelector('.name').textContent}」請填 0～${max} 分，或留空`);
+      return;
+    }
+    scores.push({ criteriaId, score, comment: commentInput.value.trim() });
+  }
+
+  $('btn-draft').disabled = true;
+  $('btn-draft').textContent = '暫存中…';
+  const resp = await apiPost({
+    action: 'saveDraft',
+    token: state.token,
+    teamId: state.currentTeam.teamId,
+    scores,
+    overallComment: $('overall-comment').value.trim(),
+  });
+  $('btn-draft').disabled = false;
+  $('btn-draft').textContent = '暫存';
+
+  if (!resp.success) {
+    showError('score-error', resp.message || '暫存失敗，請再試一次');
+    return;
+  }
+  const saved = $('score-saved');
+  saved.textContent = '已暫存，可以先離開，之後再回來繼續填';
+  saved.classList.add('show');
+});
+
+// ---------------- 管理員總覽 / 匯出 ----------------
+
+async function enterAdmin() {
+  $('admin-who-name').textContent = state.judgeName;
+  showView('admin');
+  $('admin-content').innerHTML = '<div class="loading">載入中…</div>';
+
+  const resp = await apiGet({ action: 'getAdminOverview', token: state.token });
+  if (!resp.success) {
+    showView('login');
+    showError('login-error', resp.message || '登入已過期，請重新登入');
+    return;
+  }
+  renderAdmin(resp.teams);
+}
+
+function renderAdmin(teams) {
+  const groups = {};
+  teams.forEach(t => {
+    if (!groups[t.category]) groups[t.category] = [];
+    groups[t.category].push(t);
+  });
+
+  let html = '';
+  Object.keys(groups).forEach(cat => {
+    html += `<div class="section-title">${cat}</div>`;
+    groups[cat].forEach(t => {
+      html += `<div class="card" style="padding:16px 20px;margin-bottom:10px;">
+        <div style="font-weight:700;font-size:15px;margin-bottom:2px;">${t.name}　<span style="color:var(--ink-soft);font-weight:400;font-size:13px;">（${t.anonCode}）</span></div>`;
+      if (t.judges.length === 0) {
+        html += `<div style="font-size:13px;color:var(--ink-soft);margin-top:8px;">尚未指派評審</div>`;
+      } else {
+        t.judges.forEach(j => {
+          const statusText = j.completed ? `${j.decision}（${j.totalScore}分）` : '尚未評分';
+          const statusClass = j.completed ? (j.decision === '通過' ? 'pass' : 'fail') : 'pending';
+          html += `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line);">
+              <span style="font-size:14px;">${j.judgeName}　<span class="status ${statusClass}">${statusText}</span></span>
+              ${j.completed
+                ? `<button class="btn-export" data-judge-id="${j.judgeId}" data-team-id="${t.teamId}" style="width:auto;margin:0;padding:6px 14px;font-size:13px;">匯出 PDF</button>`
+                : `<span style="font-size:12px;color:var(--ink-soft);">無法匯出</span>`}
+            </div>`;
+        });
+      }
+      html += `</div>`;
+    });
+  });
+  $('admin-content').innerHTML = html || '<div class="loading">目前沒有受評項目</div>';
+
+  document.querySelectorAll('.btn-export').forEach(btn => {
+    btn.addEventListener('click', () => exportReview(btn));
+  });
+}
+
+async function exportReview(btn) {
+  const judgeId = btn.dataset.judgeId;
+  const teamId = btn.dataset.teamId;
+  btn.disabled = true;
+  btn.textContent = '匯出中…';
+
+  const resp = await apiGet({ action: 'exportReview', token: state.token, judgeId, teamId });
+
+  btn.disabled = false;
+  btn.textContent = '匯出 PDF';
+
+  if (!resp.success) {
+    alert(resp.message || '匯出失敗，請再試一次');
+    return;
+  }
+  window.open(resp.pdfUrl, '_blank');
+}
+
 // ---------------- 初始化 ----------------
 
-if (state.token) {
+if (state.token && state.role === '管理員') {
+  enterAdmin();
+} else if (state.token) {
   enterList();
 } else {
   showView('home');
