@@ -261,6 +261,18 @@
     padding: 16px;
     margin-bottom: 14px;
   }
+  .crit-block--sub {
+    margin-left: 18px;
+    border-left: 3px solid var(--sage-tint);
+  }
+  .crit-group-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--sage-dark);
+    margin: 14px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+  }
   .crit-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
   .crit-head .name { font-size: 15px; font-weight: 700; }
   .crit-head .max { font-size: 12px; color: var(--ink-soft); }
@@ -498,6 +510,30 @@ function errMsg_(err) {
   return '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
 }
 
+// 評分項目名稱裡如果有「－」（例如「文獻查證－內容涵蓋性」），代表它是某個
+// 大項底下的小項，這裡把同一個大項的小項自動分組、插入群組標題，
+// 沒有「－」的項目（題目、前言、結論...）維持原樣、不受影響。
+function groupCriteria_(criteria) {
+  const result = [];
+  let lastGroup = null;
+  criteria.forEach(c => {
+    const idx = c.name.indexOf('－');
+    if (idx > -1) {
+      const group = c.name.slice(0, idx);
+      const label = c.name.slice(idx + 1);
+      if (group !== lastGroup) {
+        result.push({ type: 'group', text: group });
+        lastGroup = group;
+      }
+      result.push({ type: 'item', c: c, label: label, isSub: true });
+    } else {
+      lastGroup = null;
+      result.push({ type: 'item', c: c, label: c.name, isSub: false });
+    }
+  });
+  return result;
+}
+
 // ---------------- 首頁進度總覽 ----------------
 
 $('btn-nav-login').addEventListener('click', () => showView('login'));
@@ -668,12 +704,16 @@ async function openScoreForm(teamId) {
     (myResp.scores || []).forEach(s => { prevScores[s.criteriaId] = s; });
   }
 
-  $('crit-list').innerHTML = state.criteria.map(c => {
+  $('crit-list').innerHTML = groupCriteria_(state.criteria).map(entry => {
+    if (entry.type === 'group') {
+      return `<div class="crit-group-title">${entry.text}</div>`;
+    }
+    const c = entry.c;
     const prev = prevScores[c.criteriaId];
     return `
-      <div class="crit-block" data-criteria-id="${c.criteriaId}" data-max="${c.maxPoints}">
+      <div class="crit-block${entry.isSub ? ' crit-block--sub' : ''}" data-criteria-id="${c.criteriaId}" data-max="${c.maxPoints}">
         <div class="crit-head">
-          <span class="name">${c.name}</span>
+          <span class="name">${entry.label}</span>
           <span class="max">滿分 ${c.maxPoints}</span>
         </div>
         <div class="crit-desc">${c.description}</div>
@@ -853,14 +893,20 @@ async function openPrintView(judgeId, teamId) {
     return;
   }
 
-  const rows = resp.criteria.map(c => `
+  const rows = groupCriteria_(resp.criteria).map(entry => {
+    if (entry.type === 'group') {
+      return `<tr><td colspan="5" style="background:var(--sage-tint);color:var(--sage-dark);font-weight:700;">${entry.text}</td></tr>`;
+    }
+    const c = entry.c;
+    return `
     <tr>
-      <td style="font-weight:600;">${c.name}</td>
+      <td style="font-weight:600;${entry.isSub ? 'padding-left:24px;' : ''}">${entry.label}</td>
       <td style="white-space:pre-line;color:var(--ink-soft);">${c.description}</td>
       <td style="text-align:center;">${c.maxPoints}</td>
       <td style="text-align:center;font-weight:700;">${c.score === null ? '-' : c.score}</td>
       <td>${c.comment || ''}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
   $('print-content').innerHTML = `
     <h2 style="margin:0 0 4px;">${resp.category}評分表</h2>
