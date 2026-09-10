@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>佳里奇美醫院｜評審評分系統</title>
+<title>佳里奇美醫院｜護理部特殊作業審查評分系統</title>
 <style>
   :root {
     --bg: #F6F4EF;
@@ -26,38 +26,128 @@
     color: var(--ink);
     min-height: 100vh;
   }
-  header {
-    padding: 28px 20px 18px;
-    text-align: center;
-    border-bottom: 1px solid var(--line);
+
+  /* 置頂導覽列 */
+  .topnav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 32px;
     background: var(--card);
+    border-bottom: 1px solid var(--line);
   }
-  header h1 {
-    margin: 0 0 4px;
-    font-size: 19px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-  }
-  header p {
+  .topnav .brand { display: flex; flex-direction: column; }
+  .topnav .brand .org { font-size: 12px; color: var(--ink-soft); }
+  .topnav .brand .title { font-size: 17px; font-weight: 700; }
+  .topnav button.nav-login {
+    width: auto;
     margin: 0;
-    font-size: 13px;
-    color: var(--ink-soft);
+    padding: 10px 20px;
+    font-size: 14px;
   }
+
   main {
-    max-width: 900px;
+    max-width: 1000px;
     margin: 0 auto;
-    padding: 28px 24px 60px;
+    padding: 32px 24px 60px;
   }
+  main.wide { max-width: 1000px; }
+
+  /* 首頁 hero */
+  .hero { padding: 8px 4px 30px; }
+  .hero .eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--sage-dark);
+    text-transform: uppercase;
+  }
+  .hero h1 {
+    font-size: 30px;
+    margin: 10px 0 6px;
+    line-height: 1.35;
+  }
+  .hero .tagline {
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin-bottom: 26px;
+  }
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .stat-card .num { font-size: 26px; font-weight: 700; color: var(--sage-dark); }
+  .stat-card .label { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+  .progress-panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+  }
+  .progress-panel .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .progress-panel .panel-head .note { font-size: 12px; font-weight: 400; color: var(--ink-soft); }
+  .judge-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .judge-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: #FDFCFA;
+  }
+  .judge-card .row1 {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .judge-card .row1 .pct { color: var(--sage-dark); }
+  .bar-track { height: 6px; background: var(--sage-tint); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--sage); }
+  .judge-card .row2 { font-size: 11px; color: var(--ink-soft); margin-top: 6px; }
+
+  .privacy-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 18px;
+    padding: 12px 16px;
+    background: #FBF3E3;
+    border: 1px solid #EBDFC2;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #8A6D2F;
+  }
+  .cta-row { margin-top: 26px; text-align: center; }
+  .cta-row button { max-width: 260px; margin: 0 auto; }
+
+  /* 卡片與表單元件 */
   .card {
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: var(--radius);
     padding: 28px 32px;
   }
-  .card--narrow {
-    max-width: 440px;
-    margin: 0 auto;
-  }
+  .card--narrow { max-width: 440px; margin: 0 auto; }
   .card + .card { margin-top: 16px; }
   label {
     display: block;
@@ -102,12 +192,6 @@
   }
   button:hover { background: var(--sage-dark); }
   button:disabled { background: #B9C4BF; cursor: default; }
-  button.ghost {
-    background: transparent;
-    color: var(--sage-dark);
-    border: 1px solid var(--sage);
-  }
-  button.ghost:hover { background: var(--sage-tint); }
   .error {
     margin-top: 12px;
     padding: 10px 12px;
@@ -124,10 +208,7 @@
     align-items: center;
     margin-bottom: 16px;
   }
-  .topbar .who {
-    font-size: 14px;
-    color: var(--ink-soft);
-  }
+  .topbar .who { font-size: 14px; color: var(--ink-soft); }
   .topbar .who b { color: var(--ink); }
   .logout {
     font-size: 13px;
@@ -161,11 +242,7 @@
   }
   .team-item:hover { border-color: var(--sage); }
   .team-item .code { font-size: 15px; font-weight: 600; }
-  .team-item .status {
-    font-size: 12px;
-    padding: 3px 9px;
-    border-radius: 20px;
-  }
+  .team-item .status { font-size: 12px; padding: 3px 9px; border-radius: 20px; }
   .status.pending { background: #EFEAE0; color: var(--ink-soft); }
   .status.pass { background: var(--sage-tint); color: var(--sage-dark); }
   .status.fail { background: var(--warn-tint); color: var(--warn); }
@@ -175,29 +252,13 @@
     padding: 16px;
     margin-bottom: 14px;
   }
-  .crit-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 6px;
-  }
+  .crit-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
   .crit-head .name { font-size: 15px; font-weight: 700; }
   .crit-head .max { font-size: 12px; color: var(--ink-soft); }
-  .crit-desc {
-    font-size: 13px;
-    color: var(--ink-soft);
-    white-space: pre-line;
-    line-height: 1.6;
-    margin-bottom: 12px;
-  }
+  .crit-desc { font-size: 13px; color: var(--ink-soft); white-space: pre-line; line-height: 1.6; margin-bottom: 12px; }
   .score-row { display: flex; gap: 10px; align-items: flex-start; }
   .score-row input[type="number"] { max-width: 90px; }
-  .score-row textarea.crit-comment {
-    flex: 1;
-    min-height: 60px;
-    font-size: 14px;
-    resize: vertical;
-  }
+  .score-row textarea.crit-comment { flex: 1; min-height: 60px; font-size: 14px; resize: vertical; }
   .back-link {
     display: inline-block;
     margin-bottom: 14px;
@@ -219,19 +280,56 @@
   .total-bar b { font-size: 18px; color: var(--sage-dark); }
   .hidden { display: none !important; }
   .loading { text-align: center; color: var(--ink-soft); font-size: 13px; padding: 20px 0; }
+
+  @media (max-width: 720px) {
+    .stat-row { grid-template-columns: 1fr; }
+    .judge-grid { grid-template-columns: 1fr 1fr; }
+    .topnav { padding: 14px 18px; }
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>特殊作業審查</h1>
-  <p>評審登入評分系統</p>
-</header>
+<div class="topnav">
+  <div class="brand">
+    <span class="org">奇美醫療財團法人 佳里奇美醫院</span>
+    <span class="title">護理部特殊作業審查評分系統</span>
+  </div>
+  <button class="nav-login" id="btn-nav-login">評審登入</button>
+</div>
 
 <main>
 
+  <!-- 首頁：公開進度總覽 -->
+  <section id="view-home">
+    <div class="hero">
+      <div class="eyebrow">SPECIAL REPORT REVIEW</div>
+      <h1>護理部特殊作業審查評分系統</h1>
+
+      <div class="stat-row">
+        <div class="stat-card"><div class="num" id="home-judge-count">–</div><div class="label">評審人數</div></div>
+        <div class="stat-card"><div class="num" id="home-overall-pct">–</div><div class="label">整體完成率</div></div>
+        <div class="stat-card"><div class="num" id="home-completed">–</div><div class="label">完成評分項目</div></div>
+      </div>
+
+      <div class="progress-panel">
+        <div class="panel-head">
+          <span id="home-panel-title">評審評分進度</span>
+          <span class="note">首頁不公開任何分數及評語</span>
+        </div>
+        <div class="judge-grid" id="judge-grid"><div class="loading">載入中…</div></div>
+      </div>
+
+      <div class="privacy-note">🔒 評審登入後只能看到自己的評分資料。</div>
+
+      <div class="cta-row">
+        <button id="btn-cta-login">登入評分系統</button>
+      </div>
+    </div>
+  </section>
+
   <!-- 登入畫面 -->
-  <section id="view-login" class="card card--narrow">
+  <section id="view-login" class="card card--narrow hidden">
     <label for="account">帳號</label>
     <input type="text" id="account" autocomplete="username">
     <label for="password">密碼</label>
@@ -283,9 +381,10 @@ let state = {
 };
 
 const $ = (id) => document.getElementById(id);
+const VIEWS = ['home', 'login', 'list', 'score'];
 
 function showView(name) {
-  ['login', 'list', 'score'].forEach(v => {
+  VIEWS.forEach(v => {
     $('view-' + v).classList.toggle('hidden', v !== name);
   });
 }
@@ -333,6 +432,31 @@ async function apiPost(payload) {
   }
 }
 
+// ---------------- 首頁進度總覽 ----------------
+
+$('btn-nav-login').addEventListener('click', () => showView('login'));
+$('btn-cta-login').addEventListener('click', () => showView('login'));
+
+async function loadHomeProgress() {
+  const resp = await apiGet({ action: 'getProgress' });
+  if (!resp.success) {
+    $('judge-grid').innerHTML = `<div class="loading">${resp.message || '進度資料載入失敗'}</div>`;
+    return;
+  }
+  $('home-judge-count').textContent = resp.judgeCount;
+  $('home-overall-pct').textContent = resp.overallPercent + '%';
+  $('home-completed').textContent = `${resp.completedCount} / ${resp.totalAssignments}`;
+  $('home-panel-title').textContent = `${resp.judgeCount} 位評審評分進度`;
+
+  $('judge-grid').innerHTML = resp.perJudge.map(j => `
+    <div class="judge-card">
+      <div class="row1"><span>${j.name}</span><span class="pct">${j.percent}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${j.percent}%"></div></div>
+      <div class="row2">完成 ${j.completed} ｜ 未評 ${j.pending}</div>
+    </div>
+  `).join('') || '<div class="loading">尚無評審資料</div>';
+}
+
 // ---------------- 登入 ----------------
 
 $('btn-login').addEventListener('click', async () => {
@@ -362,7 +486,8 @@ $('btn-logout').addEventListener('click', () => {
   state.token = null;
   localStorage.removeItem('rs_token');
   localStorage.removeItem('rs_name');
-  showView('login');
+  showView('home');
+  loadHomeProgress();
 });
 
 // ---------------- 受評清單 ----------------
@@ -528,7 +653,8 @@ $('btn-submit').addEventListener('click', async () => {
 if (state.token) {
   enterList();
 } else {
-  showView('login');
+  showView('home');
+  loadHomeProgress();
 }
 </script>
 
