@@ -422,37 +422,56 @@ function clearError(elId) {
   $(elId).textContent = '';
 }
 
+async function fetchJson_(url, options) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+  const res = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+  clearTimeout(timeout);
+  return await res.json(); // 回應不是合法 JSON 時會在這裡丟出 SyntaxError
+}
+
+// GAS 網頁應用程式偶爾會在剛部署完/久未使用時，回傳一個轉址用的錯誤頁面而不是
+// 正常的 JSON（Google 內部 script.google.com → script.googleusercontent.com 轉址偶爾踩空），
+// 這種情況通常重試一次就會恢復正常，所以這裡自動重試一次，不用使用者自己再按一次。
+async function withRetry_(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err.name === 'SyntaxError') {
+      await new Promise(r => setTimeout(r, 1500));
+      return await fn(); // 第二次還是失敗就讓外層 catch 處理
+    }
+    throw err;
+  }
+}
+
 async function apiGet(params) {
   try {
     const url = GAS_URL + '?' + new URLSearchParams(params).toString();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-    return await res.json();
+    return await withRetry_(() => fetchJson_(url));
   } catch (err) {
     console.error('apiGet 失敗：', err);
-    const msg = err.name === 'AbortError' ? '連線逾時（60秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
-    return { success: false, message: msg };
+    return { success: false, message: errMsg_(err) };
   }
 }
 async function apiPost(payload) {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
-    const res = await fetch(GAS_URL, {
+    const options = {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免 CORS 預檢
       body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    return await res.json();
+    };
+    return await withRetry_(() => fetchJson_(GAS_URL, options));
   } catch (err) {
     console.error('apiPost 失敗：', err);
-    const msg = err.name === 'AbortError' ? '連線逾時（60秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
-    return { success: false, message: msg };
+    return { success: false, message: errMsg_(err) };
   }
+}
+
+function errMsg_(err) {
+  if (err.name === 'AbortError') return '連線逾時（60秒無回應），請重試';
+  if (err.name === 'SyntaxError') return 'Google 伺服器暫時忙線，請稍後再試一次（通常幾秒後就會恢復）';
+  return '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
 }
 
 // ---------------- 首頁進度總覽 ----------------
