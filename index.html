@@ -261,7 +261,7 @@
 
 <script>
 // ⚠️ 部署 GAS 網頁應用程式後，把網址貼在這裡
-const GAS_URL = 'https://script.google.com/macros/s/替換成你的部署ID/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzxe1nuTJvG9EEHPTC0I9wEJ7vNLf65fDd7uZGcuIFMa_xL1JuMCv_lZyDo7v_kgM8R/exec';
 
 let state = {
   token: localStorage.getItem('rs_token') || null,
@@ -290,17 +290,27 @@ function clearError(elId) {
 }
 
 async function apiGet(params) {
-  const url = GAS_URL + '?' + new URLSearchParams(params).toString();
-  const res = await fetch(url);
-  return res.json();
+  try {
+    const url = GAS_URL + '?' + new URLSearchParams(params).toString();
+    const res = await fetch(url);
+    return await res.json();
+  } catch (err) {
+    console.error('apiGet 失敗：', err);
+    return { success: false, message: '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）' };
+  }
 }
 async function apiPost(payload) {
-  const res = await fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免 CORS 預檢
-    body: JSON.stringify(payload),
-  });
-  return res.json();
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免 CORS 預檢
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('apiPost 失敗：', err);
+    return { success: false, message: '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）' };
+  }
 }
 
 // ---------------- 登入 ----------------
