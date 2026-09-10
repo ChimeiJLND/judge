@@ -290,6 +290,19 @@
   .hidden { display: none !important; }
   .loading { text-align: center; color: var(--ink-soft); font-size: 13px; padding: 20px 0; }
 
+  /* 列印評分表 */
+  .print-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+  .print-table th, .print-table td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  .print-table th { background: var(--sage-tint); color: var(--sage-dark); font-weight: 700; }
+  .print-header-table td { border: 1px solid var(--line); padding: 8px 10px; }
+  .print-footer-row { display: flex; justify-content: space-between; margin-top: 16px; font-size: 14px; }
+  @media print {
+    .topnav, .no-print, .back-link { display: none !important; }
+    body { background: #fff; }
+    main { max-width: 100%; padding: 0; }
+    .card { border: none; padding: 0; }
+  }
+
   @media (max-width: 720px) {
     .stat-row { grid-template-columns: 1fr; }
     .judge-grid { grid-template-columns: 1fr 1fr; }
@@ -365,6 +378,15 @@
     <div id="admin-content"><div class="loading">載入中…</div></div>
   </section>
 
+  <!-- 列印用評分表 -->
+  <section id="view-print" class="hidden">
+    <div class="no-print" style="margin-bottom:16px;">
+      <span class="back-link" id="btn-print-back">← 返回管理員總覽</span>
+      <button id="btn-print-now" style="width:auto;margin:0 0 0 12px;padding:9px 18px;font-size:13px;display:inline-block;">列印 / 另存 PDF</button>
+    </div>
+    <div id="print-content" class="card"><div class="loading">載入中…</div></div>
+  </section>
+
   <!-- 評分表單 -->
   <section id="view-score" class="hidden">
     <span class="back-link" id="btn-back">← 返回清單</span>
@@ -404,7 +426,7 @@ let state = {
 };
 
 const $ = (id) => document.getElementById(id);
-const VIEWS = ['home', 'login', 'list', 'score', 'admin'];
+const VIEWS = ['home', 'login', 'list', 'score', 'admin', 'print'];
 
 function showView(name) {
   VIEWS.forEach(v => {
@@ -794,11 +816,9 @@ function renderAdmin(teams) {
             statusClass = j.decision === '通過' ? 'pass' : 'fail';
           }
 
-          let action = `<span style="font-size:12px;color:var(--ink-soft);">尚無 PDF</span>`;
-          if (j.status === 'done' && j.pdfUrl) {
-            action = `<a href="${j.pdfUrl}" target="_blank" style="font-size:13px;color:var(--sage-dark);">查看 PDF</a>`;
-          } else if (j.status === 'done' && !j.pdfUrl) {
-            action = `<button class="btn-regen" data-judge-id="${j.judgeId}" data-team-id="${t.teamId}" style="width:auto;margin:0;padding:6px 14px;font-size:13px;">重新產生 PDF</button>`;
+          let action = `<span style="font-size:12px;color:var(--ink-soft);">尚無資料</span>`;
+          if (j.status === 'done') {
+            action = `<button class="btn-print" data-judge-id="${j.judgeId}" data-team-id="${t.teamId}" style="width:auto;margin:0;padding:6px 14px;font-size:13px;">列印評分表</button>`;
           }
 
           html += `
@@ -813,27 +833,55 @@ function renderAdmin(teams) {
   });
   $('admin-content').innerHTML = html || '<div class="loading">目前沒有受評項目</div>';
 
-  document.querySelectorAll('.btn-regen').forEach(btn => {
-    btn.addEventListener('click', () => regeneratePdf(btn));
+  document.querySelectorAll('.btn-print').forEach(btn => {
+    btn.addEventListener('click', () => openPrintView(btn.dataset.judgeId, btn.dataset.teamId));
   });
 }
 
-async function regeneratePdf(btn) {
-  const judgeId = btn.dataset.judgeId;
-  const teamId = btn.dataset.teamId;
-  btn.disabled = true;
-  btn.textContent = '產生中…';
+$('btn-print-back').addEventListener('click', () => showView('admin'));
+$('btn-print-now').addEventListener('click', () => window.print());
 
-  const resp = await apiGet({ action: 'exportReview', token: state.token, judgeId, teamId });
+async function openPrintView(judgeId, teamId) {
+  showView('print');
+  $('print-content').innerHTML = '<div class="loading">載入中…</div>';
 
+  const resp = await apiGet({ action: 'getReviewDetail', token: state.token, judgeId, teamId });
   if (!resp.success) {
-    btn.disabled = false;
-    btn.textContent = '重新產生 PDF';
-    alert(resp.message || '產生失敗，請再試一次');
+    $('print-content').innerHTML = `<div class="loading">${resp.message || '載入失敗'}</div>`;
     return;
   }
-  // 重新整理這個管理員畫面，讓按鈕換成「查看 PDF」連結
-  await enterAdmin();
+
+  const rows = resp.criteria.map(c => `
+    <tr>
+      <td style="font-weight:600;">${c.name}</td>
+      <td style="white-space:pre-line;color:var(--ink-soft);">${c.description}</td>
+      <td style="text-align:center;">${c.maxPoints}</td>
+      <td style="text-align:center;font-weight:700;">${c.score === null ? '-' : c.score}</td>
+      <td>${c.comment || ''}</td>
+    </tr>`).join('');
+
+  $('print-content').innerHTML = `
+    <h2 style="margin:0 0 4px;">${resp.category}評分表</h2>
+    <p style="color:var(--ink-soft);font-size:13px;margin:0 0 16px;">評審登入評分系統</p>
+    <table class="print-header-table" style="width:100%;border-collapse:collapse;">
+      <tr><td style="width:120px;font-weight:700;background:var(--sage-tint);">受評編號</td><td>${resp.anonCode}</td></tr>
+      <tr><td style="font-weight:700;background:var(--sage-tint);">姓名/隊伍名稱</td><td>${resp.name}</td></tr>
+      <tr><td style="font-weight:700;background:var(--sage-tint);">評審</td><td>${resp.judgeName}</td></tr>
+    </table>
+    <table class="print-table">
+      <thead><tr><th>項目</th><th>內容說明（細項）</th><th>配分</th><th>評分</th><th>評語</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="print-footer-row">
+      <span><b>總分：</b>${resp.totalScore}</span>
+      <span><b>審查決議：</b>${resp.decision}</span>
+      <span><b>評分日期：</b>${resp.reviewDate}</span>
+    </div>
+    <div style="margin-top:16px;">
+      <b>整體總評：</b>
+      <p style="white-space:pre-line;margin-top:6px;">${resp.overallComment || '（無）'}</p>
+    </div>
+  `;
 }
 
 // ---------------- 初始化 ----------------
