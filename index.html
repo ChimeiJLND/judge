@@ -44,15 +44,19 @@
     color: var(--ink-soft);
   }
   main {
-    max-width: 480px;
+    max-width: 900px;
     margin: 0 auto;
-    padding: 24px 18px 60px;
+    padding: 28px 24px 60px;
   }
   .card {
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 24px 20px;
+    padding: 28px 32px;
+  }
+  .card--narrow {
+    max-width: 440px;
+    margin: 0 auto;
   }
   .card + .card { margin-top: 16px; }
   label {
@@ -81,6 +85,7 @@
     box-shadow: 0 0 0 3px var(--sage-tint);
   }
   textarea { resize: vertical; min-height: 64px; }
+  textarea#overall-comment { min-height: 130px; font-size: 15px; }
   button {
     width: 100%;
     padding: 13px;
@@ -185,8 +190,14 @@
     line-height: 1.6;
     margin-bottom: 12px;
   }
-  .score-row { display: flex; gap: 10px; align-items: center; }
+  .score-row { display: flex; gap: 10px; align-items: flex-start; }
   .score-row input[type="number"] { max-width: 90px; }
+  .score-row textarea.crit-comment {
+    flex: 1;
+    min-height: 60px;
+    font-size: 14px;
+    resize: vertical;
+  }
   .back-link {
     display: inline-block;
     margin-bottom: 14px;
@@ -213,14 +224,14 @@
 <body>
 
 <header>
-  <h1>全院數據平台期末成果競賽</h1>
+  <h1>特殊作業審查</h1>
   <p>評審登入評分系統</p>
 </header>
 
 <main>
 
   <!-- 登入畫面 -->
-  <section id="view-login" class="card">
+  <section id="view-login" class="card card--narrow">
     <label for="account">帳號</label>
     <input type="text" id="account" autocomplete="username">
     <label for="password">密碼</label>
@@ -292,24 +303,33 @@ function clearError(elId) {
 async function apiGet(params) {
   try {
     const url = GAS_URL + '?' + new URLSearchParams(params).toString();
-    const res = await fetch(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
     return await res.json();
   } catch (err) {
     console.error('apiGet 失敗：', err);
-    return { success: false, message: '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）' };
+    const msg = err.name === 'AbortError' ? '連線逾時（20秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
+    return { success: false, message: msg };
   }
 }
 async function apiPost(payload) {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
     const res = await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免 CORS 預檢
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     return await res.json();
   } catch (err) {
     console.error('apiPost 失敗：', err);
-    return { success: false, message: '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）' };
+    const msg = err.name === 'AbortError' ? '連線逾時（20秒無回應），請重試' : '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
+    return { success: false, message: msg };
   }
 }
 
@@ -404,16 +424,31 @@ async function openScoreForm(teamId) {
   $('crit-list').innerHTML = '<div class="loading">載入評分項目…</div>';
   clearError('score-error');
 
-  const [critResp, myResp] = await Promise.all([
-    apiGet({ action: 'getCriteria', category: team.category }),
-    apiGet({ action: 'getMyReview', token: state.token, teamId }),
-  ]);
+  let critResp, myResp;
+  try {
+    [critResp, myResp] = await Promise.all([
+      apiGet({ action: 'getCriteria', category: team.category }),
+      apiGet({ action: 'getMyReview', token: state.token, teamId }),
+    ]);
+  } catch (err) {
+    console.error('載入評分項目失敗：', err);
+    $('crit-list').innerHTML = '';
+    showError('score-error', '載入評分項目時發生錯誤，請重新整理再試一次');
+    return;
+  }
 
   if (!critResp.success) {
+    $('crit-list').innerHTML = '';
     showError('score-error', critResp.message || '讀取評分項目失敗');
     return;
   }
   state.criteria = critResp.criteria;
+
+  if (state.criteria.length === 0) {
+    $('crit-list').innerHTML = '';
+    showError('score-error', `類別「${team.category}」在 Criteria 分頁找不到對應的評分項目，請確認 Teams 的類別欄位跟 Criteria 的類別欄位文字完全一致`);
+    return;
+  }
 
   const prevScores = {};
   if (myResp.success) {
@@ -432,8 +467,7 @@ async function openScoreForm(teamId) {
         <div class="score-row">
           <input type="number" class="crit-score" min="0" max="${c.maxPoints}"
                  value="${prev ? prev.score : ''}" placeholder="0-${c.maxPoints}">
-          <input type="text" class="crit-comment" placeholder="評語（可選填）"
-                 value="${prev ? (prev.comment || '') : ''}" style="flex:1;">
+          <textarea class="crit-comment" rows="2" placeholder="評語（可選填）">${prev ? (prev.comment || '') : ''}</textarea>
         </div>
       </div>`;
   }).join('');
