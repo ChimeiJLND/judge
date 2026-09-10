@@ -424,7 +424,7 @@ function clearError(elId) {
 
 async function fetchJson_(url, options) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const timeout = setTimeout(() => controller.abort(), 240000);
   const res = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
   clearTimeout(timeout);
   return await res.json(); // 回應不是合法 JSON 時會在這裡丟出 SyntaxError
@@ -469,7 +469,7 @@ async function apiPost(payload) {
 }
 
 function errMsg_(err) {
-  if (err.name === 'AbortError') return '連線逾時（60秒無回應），請重試';
+  if (err.name === 'AbortError') return '連線逾時（240秒無回應），請重試';
   if (err.name === 'SyntaxError') return 'Google 伺服器暫時忙線，請稍後再試一次（通常幾秒後就會恢復）';
   return '連線失敗，請確認 GAS_URL 是否正確（詳見瀏覽器 Console）';
 }
@@ -754,7 +754,7 @@ $('btn-draft').addEventListener('click', async () => {
   saved.classList.add('show');
 });
 
-// ---------------- 管理員總覽 / 匯出 ----------------
+// ---------------- 管理員總覽 ----------------
 
 async function enterAdmin() {
   $('admin-who-name').textContent = state.judgeName;
@@ -787,14 +787,24 @@ function renderAdmin(teams) {
         html += `<div style="font-size:13px;color:var(--ink-soft);margin-top:8px;">尚未指派評審</div>`;
       } else {
         t.judges.forEach(j => {
-          const statusText = j.completed ? `${j.decision}（${j.totalScore}分）` : '尚未評分';
-          const statusClass = j.completed ? (j.decision === '通過' ? 'pass' : 'fail') : 'pending';
+          let statusText = '尚未評分', statusClass = 'pending';
+          if (j.status === 'draft') { statusText = '已暫存'; statusClass = 'draft'; }
+          if (j.status === 'done') {
+            statusText = `${j.decision}（${j.totalScore}分）`;
+            statusClass = j.decision === '通過' ? 'pass' : 'fail';
+          }
+
+          let action = `<span style="font-size:12px;color:var(--ink-soft);">尚無 PDF</span>`;
+          if (j.status === 'done' && j.pdfUrl) {
+            action = `<a href="${j.pdfUrl}" target="_blank" style="font-size:13px;color:var(--sage-dark);">查看 PDF</a>`;
+          } else if (j.status === 'done' && !j.pdfUrl) {
+            action = `<button class="btn-regen" data-judge-id="${j.judgeId}" data-team-id="${t.teamId}" style="width:auto;margin:0;padding:6px 14px;font-size:13px;">重新產生 PDF</button>`;
+          }
+
           html += `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line);">
               <span style="font-size:14px;">${j.judgeName}　<span class="status ${statusClass}">${statusText}</span></span>
-              ${j.completed
-                ? `<button class="btn-export" data-judge-id="${j.judgeId}" data-team-id="${t.teamId}" style="width:auto;margin:0;padding:6px 14px;font-size:13px;">匯出 PDF</button>`
-                : `<span style="font-size:12px;color:var(--ink-soft);">無法匯出</span>`}
+              ${action}
             </div>`;
         });
       }
@@ -803,27 +813,27 @@ function renderAdmin(teams) {
   });
   $('admin-content').innerHTML = html || '<div class="loading">目前沒有受評項目</div>';
 
-  document.querySelectorAll('.btn-export').forEach(btn => {
-    btn.addEventListener('click', () => exportReview(btn));
+  document.querySelectorAll('.btn-regen').forEach(btn => {
+    btn.addEventListener('click', () => regeneratePdf(btn));
   });
 }
 
-async function exportReview(btn) {
+async function regeneratePdf(btn) {
   const judgeId = btn.dataset.judgeId;
   const teamId = btn.dataset.teamId;
   btn.disabled = true;
-  btn.textContent = '匯出中…';
+  btn.textContent = '產生中…';
 
   const resp = await apiGet({ action: 'exportReview', token: state.token, judgeId, teamId });
 
-  btn.disabled = false;
-  btn.textContent = '匯出 PDF';
-
   if (!resp.success) {
-    alert(resp.message || '匯出失敗，請再試一次');
+    btn.disabled = false;
+    btn.textContent = '重新產生 PDF';
+    alert(resp.message || '產生失敗，請再試一次');
     return;
   }
-  window.open(resp.pdfUrl, '_blank');
+  // 重新整理這個管理員畫面，讓按鈕換成「查看 PDF」連結
+  await enterAdmin();
 }
 
 // ---------------- 初始化 ----------------
