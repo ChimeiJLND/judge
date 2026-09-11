@@ -673,12 +673,9 @@ async function openScoreForm(teamId) {
   clearError('score-error');
   $('score-saved').classList.remove('show');
 
-  let critResp, myResp;
+  let resp;
   try {
-    [critResp, myResp] = await Promise.all([
-      apiGet({ action: 'getCriteria', category: team.category }),
-      apiGet({ action: 'getMyReview', token: state.token, teamId }),
-    ]);
+    resp = await apiGet({ action: 'getScoreForm', token: state.token, teamId });
   } catch (err) {
     console.error('載入評分項目失敗：', err);
     $('crit-list').innerHTML = '';
@@ -686,12 +683,12 @@ async function openScoreForm(teamId) {
     return;
   }
 
-  if (!critResp.success) {
+  if (!resp.success) {
     $('crit-list').innerHTML = '';
-    showError('score-error', critResp.message || '讀取評分項目失敗');
+    showError('score-error', resp.message || '讀取評分項目失敗');
     return;
   }
-  state.criteria = critResp.criteria;
+  state.criteria = resp.criteria;
 
   if (state.criteria.length === 0) {
     $('crit-list').innerHTML = '';
@@ -700,9 +697,7 @@ async function openScoreForm(teamId) {
   }
 
   const prevScores = {};
-  if (myResp.success) {
-    (myResp.scores || []).forEach(s => { prevScores[s.criteriaId] = s; });
-  }
+  (resp.scores || []).forEach(s => { prevScores[s.criteriaId] = s; });
 
   $('crit-list').innerHTML = groupCriteria_(state.criteria).map(entry => {
     if (entry.type === 'group') {
@@ -725,7 +720,7 @@ async function openScoreForm(teamId) {
       </div>`;
   }).join('');
 
-  $('overall-comment').value = (myResp.success && myResp.overallComment) || '';
+  $('overall-comment').value = resp.overallComment || '';
 
   document.querySelectorAll('.crit-score').forEach(inp => {
     inp.addEventListener('input', updateLiveTotal);
